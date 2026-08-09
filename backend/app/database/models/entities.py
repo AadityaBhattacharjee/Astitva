@@ -43,6 +43,8 @@ class UserProfile(Base, TimestampMixin):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     language: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    onboarding_data: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     user: Mapped["User"] = relationship(back_populates="profile")
 
 
@@ -139,6 +141,7 @@ class RoadmapTask(Base, TimestampMixin):
     roadmap_id: Mapped[int] = mapped_column(ForeignKey("roadmaps.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(50), default="PENDING")
     priority: Mapped[str] = mapped_column(String(20), default="MEDIUM")
     roadmap: Mapped["Roadmap"] = relationship(back_populates="tasks")

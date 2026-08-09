@@ -1,4 +1,4 @@
-"""User CRUD routes for Phase 1."""
+"""User routes."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -13,8 +13,16 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/", response_model=list[UserRead])
-def list_users(db: Session = Depends(get_db)) -> list[User]:
-    statement = select(User).options(selectinload(User.profile)).order_by(User.id)
+def list_users(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[User]:
+    statement = (
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.id == current_user.id)
+        .order_by(User.id)
+    )
     return list(db.scalars(statement).all())
 
 

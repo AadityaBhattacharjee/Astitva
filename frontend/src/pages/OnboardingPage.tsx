@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StepIndicator } from "@/components/astitva/StepIndicator";
 import { OptionGroup, Select, TextInput } from "@/components/astitva/Form";
+import { roadmapApi, userApi } from "@/api/client";
 
 const steps = ["About You", "Current Situation", "Immediate Needs", "Goals", "Constraints", "Review"];
 
@@ -82,15 +83,27 @@ export default function OnboardingPage() {
       update({ [key]: next } as Partial<Assessment>);
 
   const submit = async () => {
-    setProcessing(true);
-    for (let i = 0; i < processingMessages.length; i++) {
-      setProcessingIndex(i);
-      await new Promise((r) => setTimeout(r, 750));
+    try {
+      setProcessing(true);
+      for (let i = 0; i < processingMessages.length; i++) {
+        setProcessingIndex(i);
+        await new Promise((r) => setTimeout(r, 750));
+      }
+
+      await userApi.upsertProfile({
+        state: assessment.location || null,
+        language: assessment.language || null,
+        onboarding_data: assessment as unknown as Record<string, unknown>,
+      });
+      await roadmapApi.generate(false);
+
+      toast.success("Your profile and roadmap are ready!");
+      await navigate("/roadmap");
+    } catch (error) {
+      setProcessing(false);
+      const message = error instanceof Error ? error.message : "Could not save onboarding.";
+      toast.error(message);
     }
-    // Store assessment in sessionStorage for Dashboard to use
-    sessionStorage.setItem("astitva.assessment", JSON.stringify(assessment));
-    toast.success("Your profile is ready!");
-    await navigate("/dashboard");
   };
 
   if (processing) {

@@ -58,7 +58,7 @@ export default function ProgressPage() {
     );
   }
 
-  const pct = (data.progress_summary.overall_completion_pct ?? 0) * 100;
+  const pct = data.progress_summary.overall_completion_pct ?? 0;
 
   return (
     <AppLayout

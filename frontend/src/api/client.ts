@@ -126,7 +126,140 @@ export const userApi = {
       full_name: string | null;
       state: string | null;
       language: string | null;
+      onboarding_data: Record<string, unknown>;
+      onboarding_completed_at: string | null;
     }>("/profile/me"),
+
+  upsertProfile: (payload: {
+    full_name?: string | null;
+    state?: string | null;
+    language?: string | null;
+    onboarding_data: Record<string, unknown>;
+    onboarding_completed_at?: string | null;
+  }) =>
+    request<{
+      id: number;
+      user_id: number;
+      full_name: string | null;
+      state: string | null;
+      language: string | null;
+      onboarding_data: Record<string, unknown>;
+      onboarding_completed_at: string | null;
+    }>("/profile/me", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+};
+
+export const roadmapApi = {
+  getMine: () =>
+    request<{
+      roadmap: {
+        id: number;
+        user_id: number;
+        title: string;
+        summary: string | null;
+        status: string;
+        tasks: Array<{
+          id: number;
+          roadmap_id: number;
+          title: string;
+          description: string | null;
+          sequence: number;
+          status: string;
+          priority: string;
+        }>;
+      };
+      progress: {
+        id: number;
+        roadmap_id: number;
+        status: string;
+        completed_milestones: number;
+        missed_milestones: number;
+        overdue_tasks: number;
+        engagement_history: string[];
+      };
+      created: boolean;
+    }>("/roadmaps/me"),
+
+  generate: (force_refresh = false) =>
+    request<{
+      roadmap: {
+        id: number;
+        user_id: number;
+        title: string;
+        summary: string | null;
+        status: string;
+        tasks: Array<{
+          id: number;
+          roadmap_id: number;
+          title: string;
+          description: string | null;
+          sequence: number;
+          status: string;
+          priority: string;
+        }>;
+      };
+      progress: {
+        id: number;
+        roadmap_id: number;
+        status: string;
+        completed_milestones: number;
+        missed_milestones: number;
+        overdue_tasks: number;
+        engagement_history: string[];
+      };
+      created: boolean;
+    }>("/roadmaps/generate", {
+      method: "POST",
+      body: JSON.stringify({ force_refresh }),
+    }),
+
+  updateTask: (taskId: number, statusValue: string) =>
+    request<{
+      roadmap: {
+        id: number;
+        user_id: number;
+        title: string;
+        summary: string | null;
+        status: string;
+        tasks: Array<{
+          id: number;
+          roadmap_id: number;
+          title: string;
+          description: string | null;
+          sequence: number;
+          status: string;
+          priority: string;
+        }>;
+      };
+      progress: {
+        id: number;
+        roadmap_id: number;
+        status: string;
+        completed_milestones: number;
+        missed_milestones: number;
+        overdue_tasks: number;
+        engagement_history: string[];
+      };
+      created: boolean;
+    }>(`/roadmaps/tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: statusValue }),
+    }),
+};
+
+export const progressApi = {
+  getMine: () =>
+    request<{
+      id: number;
+      roadmap_id: number;
+      status: string;
+      completed_milestones: number;
+      missed_milestones: number;
+      overdue_tasks: number;
+      engagement_history: string[];
+    }>("/progress/me"),
 };
 
 // ---------------------------------------------------------------------------

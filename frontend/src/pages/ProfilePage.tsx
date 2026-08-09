@@ -15,6 +15,8 @@ interface ProfileData {
   full_name: string | null;
   state: string | null;
   language: string | null;
+  onboarding_data?: Record<string, unknown>;
+  onboarding_completed_at?: string | null;
 }
 
 interface CaseData {
@@ -32,6 +34,26 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState(false);
+
+  const saveProfile = async () => {
+    if (!profile) return;
+    try {
+      const updated = await userApi.upsertProfile({
+        full_name: draft || null,
+        state: profile.state,
+        language: profile.language,
+        onboarding_data: profile.onboarding_data ?? {},
+        onboarding_completed_at: profile.onboarding_completed_at ?? null,
+      });
+      setProfile(updated as ProfileData);
+      setDraft((updated as ProfileData).full_name ?? "");
+      setEditing(false);
+      toast.success("Profile updated.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not update profile.";
+      toast.error(message);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -72,8 +94,8 @@ export default function ProfilePage() {
               variant="outline"
               onClick={() => {
                 if (editing) {
-                  // In a real app: PATCH /api/v1/profile/me
-                  toast.success("Profile updated locally.");
+                  void saveProfile();
+                  return;
                 }
                 setEditing((e) => !e);
               }}

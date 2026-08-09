@@ -8,7 +8,7 @@ import { Card } from "@/components/astitva/Card";
 import { Badge } from "@/components/astitva/Badge";
 import { ProgressBar } from "@/components/astitva/ProgressBar";
 import { LoadingState } from "@/components/astitva/States";
-import { agentApi } from "@/api/client";
+import { agentApi, roadmapApi } from "@/api/client";
 import { useAuth } from "@/hooks/use-auth";
 
 const greeting = () => {
@@ -38,18 +38,19 @@ interface RiskData {
   recommended_interventions: string[];
 }
 
-const stages = [
-  { key: "safety", title: "Safety", code: "S1" },
-  { key: "stability", title: "Stability", code: "S2" },
-  { key: "financial", title: "Financial", code: "S3" },
-  { key: "career", title: "Career", code: "S4" },
-  { key: "growth", title: "Growth", code: "S5" },
-];
+interface RoadmapTask {
+  id: number;
+  title: string;
+  sequence: number;
+  status: string;
+  priority: string;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [progressData, setProgressData] = useState<ProgressData | null>(null);
   const [riskData, setRiskData] = useState<RiskData | null>(null);
+  const [tasks, setTasks] = useState<RoadmapTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -60,9 +61,10 @@ export default function DashboardPage() {
       setLoading(true);
       setError("");
       try {
-        const [progResp, riskResp] = await Promise.allSettled([
+        const [progResp, riskResp, roadmapResp] = await Promise.allSettled([
           agentApi.progress("Give me a summary of my current progress and next recommended step."),
           agentApi.risk("Assess my current risk level."),
+          roadmapApi.getMine(),
         ]);
 
         if (alive) {
@@ -71,6 +73,14 @@ export default function DashboardPage() {
           }
           if (riskResp.status === "fulfilled") {
             setRiskData(riskResp.value as RiskData);
+          }
+          if (roadmapResp?.status === "fulfilled") {
+            setTasks(
+              ((roadmapResp.value as { roadmap: { tasks: RoadmapTask[] } }).roadmap.tasks ?? [])
+                .slice()
+                .sort((a, b) => a.sequence - b.sequence)
+                .slice(0, 5),
+            );
           }
         }
       } catch (err: unknown) {
@@ -86,8 +96,7 @@ export default function DashboardPage() {
     return () => { alive = false; };
   }, []);
 
-  const overallPct =
-    (progressData?.progress_summary.overall_completion_pct ?? 0) * 100;
+  const overallPct = progressData?.progress_summary.overall_completion_pct ?? 0;
 
   const riskColor =
     riskData?.risk_level === "HIGH"
@@ -175,11 +184,11 @@ export default function DashboardPage() {
           </Card>
         </section>
 
-        {/* Roadmap stages preview */}
+        {/* Roadmap preview */}
         <section aria-labelledby="roadmap-preview">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
             <h2 id="roadmap-preview" className="text-lg font-semibold text-foreground">
-              Roadmap stages
+              Roadmap preview
             </h2>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/roadmap">
@@ -188,11 +197,15 @@ export default function DashboardPage() {
             </Button>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-5">
-            {stages.map((stage) => (
-              <Card key={stage.key} className="p-4">
-                <p className="text-xs font-semibold text-primary">{stage.code}</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">{stage.title}</p>
-                <ProgressBar className="mt-3" value={0} tone="accent" />
+            {tasks.map((task) => (
+              <Card key={task.id} className="p-4">
+                <p className="text-xs font-semibold text-primary">S{task.sequence}</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{task.title}</p>
+                <ProgressBar
+                  className="mt-3"
+                  value={task.status === "COMPLETED" ? 100 : task.status === "IN_PROGRESS" ? 50 : 0}
+                  tone="accent"
+                />
               </Card>
             ))}
           </div>

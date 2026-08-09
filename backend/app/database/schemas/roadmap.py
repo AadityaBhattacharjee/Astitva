@@ -8,6 +8,7 @@ from backend.app.database.schemas.common import TimestampedSchema
 class RoadmapTaskBase(BaseModel):
     title: str
     description: str | None = None
+    sequence: int = 0
     status: str = "PENDING"
     priority: str = "MEDIUM"
 
@@ -37,6 +38,20 @@ class RoadmapRead(RoadmapBase, TimestampedSchema):
     tasks: list[RoadmapTaskRead] = Field(default_factory=list)
 
 
+class RoadmapGenerateRequest(BaseModel):
+    force_refresh: bool = False
+
+
+class RoadmapTaskUpdate(BaseModel):
+    status: str
+
+
+class RoadmapStatusRead(BaseModel):
+    roadmap: RoadmapRead
+    progress: "ProgressRead"
+    created: bool
+
+
 class ProgressBase(BaseModel):
     status: str = "ACTIVE"
     completed_milestones: int = 0
@@ -52,3 +67,6 @@ class ProgressCreate(ProgressBase):
 class ProgressRead(ProgressBase, TimestampedSchema):
     id: int
     roadmap_id: int
+
+
+RoadmapStatusRead.model_rebuild()
