@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/layouts/AppLayout";
 import { Button } from "@/components/ui/button";
 import { SourceBadge } from "@/components/astitva/Badge";
-import { agentApi, ApiError } from "@/api/client";
+import { agentApi, ApiError, roadmapApi } from "@/api/client";
 import type { ChatMessage } from "@/types";
 
 const suggestedPrompts = [
@@ -49,14 +50,75 @@ function extractSources(data: Record<string, unknown>): string[] {
 }
 
 export default function ChatPage() {
+  const [searchParams] = useSearchParams();
   const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [taskId, setTaskId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
+
+  useEffect(() => {
+    const rawTaskId = searchParams.get("task_id");
+    if (!rawTaskId) return;
+    const parsed = Number(rawTaskId);
+    if (!Number.isFinite(parsed)) return;
+    setTaskId(parsed);
+
+    let cancelled = false;
+    async function loadTaskGuide() {
+      setThinking(true);
+      try {
+        const guide = await roadmapApi.getTaskGuide(parsed);
+        if (cancelled) return;
+        const nextSteps = guide.next_steps.length > 0
+          ? `Next steps:\n- ${guide.next_steps.join("\n- ")}`
+          : "";
+        const requiredInformation = guide.required_information.length > 0
+          ? `Required information:\n- ${guide.required_information.join("\n- ")}`
+          : "";
+        const requiredDocuments = guide.required_documents.length > 0
+          ? `Required documents:\n- ${guide.required_documents.join("\n- ")}`
+          : "";
+        const completion = guide.completion_guidance
+          ? `Completion guidance:\n${guide.completion_guidance}`
+          : "";
+        const textValue = [
+          `Task: ${guide.task.title}`,
+          guide.explanation,
+          requiredInformation,
+          requiredDocuments,
+          nextSteps,
+          completion,
+        ].filter(Boolean).join("\n\n");
+
+        setMessages([
+          {
+            id: "msg_task_guide",
+            role: "guide",
+            text: textValue,
+            at: new Date().toISOString(),
+            agentType: guide.agent_type,
+            officialResources: guide.official_resources,
+          },
+        ]);
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Could not load task guide.";
+        toast.error(message);
+      } finally {
+        if (!cancelled) setThinking(false);
+      }
+    }
+
+    void loadTaskGuide();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   const send = async (value: string) => {
     if (!value.trim() || thinking) return;
@@ -72,69 +134,77 @@ export default function ChatPage() {
     setThinking(true);
 
     try {
-      // First ask supervisor to route
-      const routing = await agentApi.supervisor(value.trim());
-      const routed = routing.routed_to;
-
       let replyText = "";
       let sources: string[] = [];
-      let agentName = routed ?? "supervisor";
+      let agentName = "supervisor";
+      let officialResources: ChatMessage["officialResources"] | undefined;
 
-      // Call the routed specialist agent
+      // Call the specialist agent
       try {
-        if (routed === "government") {
-          const r = await agentApi.government({ query: value.trim() });
-          replyText = formatAgentResponse("government", r as unknown as Record<string, unknown>);
-          sources = r.sources;
-        } else if (routed === "legal") {
-          const r = await agentApi.legal({ query: value.trim() });
-          replyText = formatAgentResponse("legal", r as unknown as Record<string, unknown>);
-          sources = r.sources;
-        } else if (routed === "healthcare") {
-          const r = await agentApi.healthcare({ query: value.trim() });
-          replyText = formatAgentResponse("healthcare", r as unknown as Record<string, unknown>);
-          sources = r.sources;
-        } else if (routed === "finance") {
-          const r = await agentApi.finance({ query: value.trim() });
-          replyText = formatAgentResponse("finance", r as unknown as Record<string, unknown>);
-          sources = r.sources;
-        } else if (routed === "employment") {
-          const r = await agentApi.employment({ query: value.trim() });
-          replyText = formatAgentResponse("employment", r as unknown as Record<string, unknown>);
-          sources = r.sources;
-        } else if (routed === "document") {
-          const r = await agentApi.document(value.trim());
-          replyText = formatAgentResponse("document", r as unknown as Record<string, unknown>);
-          sources = r.sources;
-        } else if (routed === "case_worker") {
-          const r = await agentApi.case_worker(value.trim());
-          replyText = r.case_summary;
-          agentName = "case_worker";
-        } else if (routed === "mentor_matching") {
-          const r = await agentApi.mentor_matching(value.trim());
+        if (taskId !== null) {
+          const r = await roadmapApi.taskGuideChat(taskId, value.trim());
           replyText = r.answer;
-          agentName = "mentor_matching";
-        } else if (routed === "planning") {
-          const r = await agentApi.planning(value.trim());
-          replyText = r.answer;
-          agentName = "planning";
-        } else if (routed === "progress") {
-          const r = await agentApi.progress(value.trim());
-          replyText = r.answer;
-          agentName = "progress";
-        } else if (routed === "risk") {
-          const r = await agentApi.risk(value.trim());
-          replyText = r.answer;
-          agentName = "risk";
+          sources = r.sources;
+          agentName = r.agent_type;
+          officialResources = r.official_resources;
         } else {
-          // Unknown routing — use supervisor summary
-          replyText = routing.summary;
+          const routing = await agentApi.supervisor(value.trim());
+          const routed = routing.routed_to;
+          agentName = routed ?? "supervisor";
+
+          if (routed === "government") {
+            const r = await agentApi.government({ query: value.trim() });
+            replyText = formatAgentResponse("government", r as unknown as Record<string, unknown>);
+            sources = r.sources;
+          } else if (routed === "legal") {
+            const r = await agentApi.legal({ query: value.trim() });
+            replyText = formatAgentResponse("legal", r as unknown as Record<string, unknown>);
+            sources = r.sources;
+          } else if (routed === "healthcare") {
+            const r = await agentApi.healthcare({ query: value.trim() });
+            replyText = formatAgentResponse("healthcare", r as unknown as Record<string, unknown>);
+            sources = r.sources;
+          } else if (routed === "finance") {
+            const r = await agentApi.finance({ query: value.trim() });
+            replyText = formatAgentResponse("finance", r as unknown as Record<string, unknown>);
+            sources = r.sources;
+          } else if (routed === "employment") {
+            const r = await agentApi.employment({ query: value.trim() });
+            replyText = formatAgentResponse("employment", r as unknown as Record<string, unknown>);
+            sources = r.sources;
+          } else if (routed === "document") {
+            const r = await agentApi.document(value.trim());
+            replyText = formatAgentResponse("document", r as unknown as Record<string, unknown>);
+            sources = r.sources;
+          } else if (routed === "case_worker") {
+            const r = await agentApi.case_worker(value.trim());
+            replyText = r.case_summary;
+            agentName = "case_worker";
+          } else if (routed === "mentor_matching") {
+            const r = await agentApi.mentor_matching(value.trim());
+            replyText = r.answer;
+            agentName = "mentor_matching";
+          } else if (routed === "planning") {
+            const r = await agentApi.planning(value.trim());
+            replyText = r.answer;
+            agentName = "planning";
+          } else if (routed === "progress") {
+            const r = await agentApi.progress(value.trim());
+            replyText = r.answer;
+            agentName = "progress";
+          } else if (routed === "risk") {
+            const r = await agentApi.risk(value.trim());
+            replyText = r.answer;
+            agentName = "risk";
+          } else {
+            replyText = routing.summary;
+          }
         }
       } catch (agentErr: unknown) {
         if (agentErr instanceof ApiError && agentErr.status === 401) {
           throw agentErr; // bubble up to outer catch
         }
-        replyText = `[${routed ?? "agent"}] I encountered an issue processing this request: ${agentErr instanceof Error ? agentErr.message : "Unknown error"}`;
+        replyText = `[${agentName}] I encountered an issue processing this request: ${agentErr instanceof Error ? agentErr.message : "Unknown error"}`;
       }
 
       const guideMsg: ChatMessage = {
@@ -144,6 +214,7 @@ export default function ChatPage() {
         at: new Date().toISOString(),
         agentType: agentName,
         sources: sources.length > 0 ? sources : undefined,
+        officialResources,
       };
       setMessages((m) => [...m, guideMsg]);
     } catch (err: unknown) {
@@ -188,6 +259,24 @@ export default function ChatPage() {
                   <SourceBadge sources={message.sources} />
                 </div>
               ) : null}
+              {message.officialResources && message.officialResources.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {message.officialResources.map((resource) => (
+                    <div key={resource.resource_id} className="rounded-xl border border-border bg-background/70 p-3">
+                      <p className="text-sm font-medium text-foreground">{resource.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{resource.description}</p>
+                      <a
+                        href={resource.official_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                      >
+                        Open Official Website
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
           {thinking ? (
@@ -221,7 +310,7 @@ export default function ChatPage() {
             id="guide-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Ask anything — government, legal, health, finance, employment…"
+            placeholder={taskId !== null ? "Ask about this task…" : "Ask anything — government, legal, health, finance, employment…"}
             disabled={thinking}
             className="min-h-12 rounded-full border border-input bg-surface px-4 text-sm text-foreground placeholder:text-muted-foreground disabled:opacity-50"
           />

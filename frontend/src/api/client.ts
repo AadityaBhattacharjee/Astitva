@@ -165,6 +165,12 @@ export const roadmapApi = {
           roadmap_id: number;
           title: string;
           description: string | null;
+          agent_type: string;
+          objective: string | null;
+          required_information: string[];
+          required_documents: string[];
+          completion_criteria: string | null;
+          resource_ids: string[];
           sequence: number;
           status: string;
           priority: string;
@@ -195,6 +201,12 @@ export const roadmapApi = {
           roadmap_id: number;
           title: string;
           description: string | null;
+          agent_type: string;
+          objective: string | null;
+          required_information: string[];
+          required_documents: string[];
+          completion_criteria: string | null;
+          resource_ids: string[];
           sequence: number;
           status: string;
           priority: string;
@@ -228,6 +240,12 @@ export const roadmapApi = {
           roadmap_id: number;
           title: string;
           description: string | null;
+          agent_type: string;
+          objective: string | null;
+          required_information: string[];
+          required_documents: string[];
+          completion_criteria: string | null;
+          resource_ids: string[];
           sequence: number;
           status: string;
           priority: string;
@@ -246,6 +264,59 @@ export const roadmapApi = {
     }>(`/roadmaps/tasks/${taskId}`, {
       method: "PATCH",
       body: JSON.stringify({ status: statusValue }),
+    }),
+
+  getTaskGuide: (taskId: number) =>
+    request<{
+      task: {
+        id: number;
+        roadmap_id: number;
+        title: string;
+        description: string | null;
+        agent_type: string;
+        objective: string | null;
+        required_information: string[];
+        required_documents: string[];
+        completion_criteria: string | null;
+        resource_ids: string[];
+        sequence: number;
+        status: string;
+        priority: string;
+      };
+      agent_type: string;
+      explanation: string;
+      next_steps: string[];
+      required_information: string[];
+      required_documents: string[];
+      official_resources: Array<{
+        resource_id: string;
+        name: string;
+        category: string;
+        description: string;
+        official_url: string;
+        applicable_agent_types: string[];
+      }>;
+      completion_guidance: string;
+      current_task_status: string;
+    }>(`/roadmaps/tasks/${taskId}/guide`),
+
+  taskGuideChat: (taskId: number, query: string) =>
+    request<{
+      task_id: number;
+      agent_type: string;
+      answer: string;
+      official_resources: Array<{
+        resource_id: string;
+        name: string;
+        category: string;
+        description: string;
+        official_url: string;
+        applicable_agent_types: string[];
+      }>;
+      sources: string[];
+    }>(`/roadmaps/tasks/${taskId}/guide/chat`, {
+      method: "POST",
+      body: JSON.stringify({ query }),
     }),
 };
 

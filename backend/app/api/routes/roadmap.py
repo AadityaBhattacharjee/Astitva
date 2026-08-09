@@ -8,6 +8,9 @@ from backend.app.database.models.entities import User
 from backend.app.database.schemas.roadmap import (
     RoadmapGenerateRequest,
     RoadmapStatusRead,
+    TaskGuideChatRequest,
+    TaskGuideChatResponse,
+    TaskGuideRead,
     RoadmapTaskUpdate,
 )
 from backend.app.database.session import get_db
@@ -17,12 +20,17 @@ from backend.app.services.roadmap_service import (
     RoadmapUnavailableError,
     RoadmapValidationError,
 )
+from backend.app.services.task_guide_service import TaskGuideService
 
 router = APIRouter(prefix="/roadmaps", tags=["roadmaps"])
 
 
 def _service(db: Session) -> RoadmapService:
     return RoadmapService(db=db, llm_provider=get_llm_provider())
+
+
+def _guide_service(db: Session) -> TaskGuideService:
+    return TaskGuideService(db=db, llm_provider=get_llm_provider())
 
 
 @router.get("/me", response_model=RoadmapStatusRead)
@@ -85,3 +93,30 @@ def update_my_task(
         progress=result.progress,
         created=False,
     )
+
+
+@router.get("/tasks/{task_id}/guide", response_model=TaskGuideRead)
+def get_task_guide(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskGuideRead:
+    service = _guide_service(db)
+    try:
+        return TaskGuideRead(**service.build_initial_guide(current_user.id, task_id))
+    except RoadmapValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/tasks/{task_id}/guide/chat", response_model=TaskGuideChatResponse)
+def task_guide_chat(
+    task_id: int,
+    payload: TaskGuideChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskGuideChatResponse:
+    service = _guide_service(db)
+    try:
+        return TaskGuideChatResponse(**service.answer_follow_up(current_user.id, task_id, payload.query))
+    except RoadmapValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

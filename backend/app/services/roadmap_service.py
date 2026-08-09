@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from backend.app.database.models.entities import Progress, Roadmap, RoadmapTask, User, UserProfile
 from backend.app.services.llm_provider import BaseLLMProvider, PlaceholderLLMProvider
+from backend.app.services.resource_registry import map_resource_types
 
 
 class RoadmapError(Exception):
@@ -52,11 +53,31 @@ Return this exact schema:
     {
       "title": "<task title>",
       "description": "<task description>",
-      "priority": "<HIGH|MEDIUM|LOW>"
+      "priority": "<HIGH|MEDIUM|LOW>",
+      "agent_type": "<government|document|case_worker|employment|finance|healthcare|legal|mentor_matching|planning|progress|risk>",
+      "objective": "<short statement of what the user is trying to achieve>",
+      "required_information": ["<piece of information the user should have>", ...],
+      "required_documents": ["<document name>", ...],
+      "completion_criteria": "<how the user will know this task is done>",
+      "resource_types": ["<government_scheme|government_service|document_service|employment_service|legal_aid|state_legal_aid_karnataka>", ...]
     }
   ]
 }
 """
+
+_VALID_AGENT_TYPES = {
+    "government",
+    "document",
+    "case_worker",
+    "employment",
+    "finance",
+    "healthcare",
+    "legal",
+    "mentor_matching",
+    "planning",
+    "progress",
+    "risk",
+}
 
 
 def _normalize_priority(value: Any) -> str:
@@ -64,6 +85,13 @@ def _normalize_priority(value: Any) -> str:
     if priority not in {"HIGH", "MEDIUM", "LOW"}:
         return "MEDIUM"
     return priority
+
+
+def _normalize_agent_type(value: Any) -> str:
+    agent_type = str(value or "planning").strip().lower().replace(" ", "_")
+    if agent_type not in _VALID_AGENT_TYPES:
+        return "planning"
+    return agent_type
 
 
 def _parse_json_object(raw: str) -> dict[str, Any]:
@@ -109,6 +137,24 @@ def _validate_roadmap_payload(payload: dict[str, Any]) -> dict[str, Any]:
             {
                 "title": task_title,
                 "description": str(task.get("description") or "").strip() or None,
+                "agent_type": _normalize_agent_type(task.get("agent_type")),
+                "objective": str(task.get("objective") or "").strip() or None,
+                "required_information": [
+                    str(item).strip()
+                    for item in (task.get("required_information") or [])
+                    if str(item).strip()
+                ],
+                "required_documents": [
+                    str(item).strip()
+                    for item in (task.get("required_documents") or [])
+                    if str(item).strip()
+                ],
+                "completion_criteria": str(task.get("completion_criteria") or "").strip() or None,
+                "resource_types": [
+                    str(item).strip()
+                    for item in (task.get("resource_types") or [])
+                    if str(item).strip()
+                ],
                 "priority": _normalize_priority(task.get("priority")),
                 "sequence": index,
                 "status": "PENDING",
@@ -188,7 +234,19 @@ class RoadmapService:
             self._db.flush()
 
             for task_payload in proposal["tasks"]:
-                self._db.add(RoadmapTask(roadmap_id=roadmap.id, **task_payload))
+                resource_types = task_payload.pop("resource_types", [])
+                resource_ids = map_resource_types(
+                    resource_types=resource_types,
+                    agent_type=task_payload["agent_type"],
+                    state=profile.state,
+                )
+                self._db.add(
+                    RoadmapTask(
+                        roadmap_id=roadmap.id,
+                        resource_ids=resource_ids,
+                        **task_payload,
+                    )
+                )
 
             self._db.flush()
             progress = self._ensure_progress(roadmap, created_at_event="Roadmap generated")

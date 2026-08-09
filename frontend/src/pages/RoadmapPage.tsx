@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { agentApi, roadmapApi } from "@/api/client";
@@ -52,6 +53,7 @@ interface PlanningData {
 }
 
 export default function RoadmapPage() {
+  const navigate = useNavigate();
   const [roadmapData, setRoadmapData] = useState<RoadmapData | null>(null);
   const [planningData, setPlanningData] = useState<PlanningData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +94,19 @@ export default function RoadmapPage() {
       toast.error(message);
     } finally {
       setUpdatingTaskId(null);
+    }
+  };
+
+  const startTask = async (taskId: number, currentStatus: string) => {
+    try {
+      if (currentStatus === "PENDING") {
+        const updated = await roadmapApi.updateTask(taskId, "IN_PROGRESS");
+        setRoadmapData(updated as RoadmapData);
+      }
+      await navigate(`/chat?task_id=${taskId}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not open the guide.";
+      toast.error(message);
     }
   };
 
@@ -169,8 +184,8 @@ export default function RoadmapPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={updatingTaskId === task.id || task.status === "IN_PROGRESS"}
-                      onClick={() => void updateTaskStatus(task.id, "IN_PROGRESS")}
+                      disabled={updatingTaskId === task.id}
+                      onClick={() => void startTask(task.id, task.status)}
                     >
                       Start
                     </Button>

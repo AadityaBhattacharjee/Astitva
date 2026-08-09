@@ -193,6 +193,12 @@ export interface BackendRoadmapTask {
   roadmap_id: number;
   title: string;
   description: string | null;
+  agent_type: string;
+  objective: string | null;
+  required_information: string[];
+  required_documents: string[];
+  completion_criteria: string | null;
+  resource_ids: string[];
   status: string;
   priority: string;
 }
@@ -215,6 +221,13 @@ export interface ChatMessage {
   at: ISODateString;
   agentType?: string;
   sources?: string[];
+  officialResources?: Array<{
+    resource_id: string;
+    name: string;
+    category: string;
+    description: string;
+    official_url: string;
+  }>;
 }
 
 export interface SettingsState {
