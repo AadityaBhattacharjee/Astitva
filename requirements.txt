@@ -1,0 +1,24 @@
+fastapi>=0.116.0
+uvicorn[standard]>=0.35.0
+pydantic>=2.11.0
+pydantic-settings>=2.10.0
+email-validator>=2.2.0
+sqlalchemy>=2.0.0
+psycopg[binary]>=3.2.0
+alembic>=1.16.0
+python-multipart>=0.0.20
+httpx>=0.28.0
+pytest>=8.4.0
+
+# Phase 2 — JWT authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt==4.0.1
+
+# Phase 3 — RAG prerequisites
+chromadb>=0.6.0
+sentence-transformers>=3.0.0
+pypdf>=6.0.0
+
+# Phase 5 — IBM Granite LLM
+ibm-watsonx-ai>=1.1.2

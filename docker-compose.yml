@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://astitva:astitva@db:5432/astitva
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: astitva
+      POSTGRES_USER: astitva
+      POSTGRES_PASSWORD: astitva
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U astitva -d astitva"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

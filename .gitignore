@@ -1,0 +1,50 @@
+# Environment / secrets
+.env
+.env.*
+
+# Python
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.coverage
+coverage.xml
+htmlcov/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Build output
+dist/
+build/
+**/dist/
+**/build/
+
+# Node
+node_modules/
+**/node_modules/
+
+# OS / IDE
+.DS_Store
+.vscode/
+
+# Logs
+*.log
+
+# Project temporary/reference files
+Astitva-frontend/
+
+# Local/generated data
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
